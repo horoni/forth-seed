@@ -6,13 +6,13 @@
 #define WORD_NAME_SIZE 32
 
 #define ASSERT(x)                                                              \
-  do {                                                                         \
+  do{                                                                          \
     if (!(x)) {                                                                \
       fprintf(stderr, "%s:%d: %s: assertion \"%s\" failed\n", __FILE_NAME__,   \
               __LINE__, "???"/*__func__*/, #x);                                \
       abort();                                                                 \
     }                                                                          \
-  } while (0)
+  } while(0)
 
 typedef long cell;
 typedef void (*word_fn)(void);
@@ -21,6 +21,8 @@ typedef struct Word {
 	word_fn primitive; /* non-null if word is primitive */
 	struct Word *body; /* non-null if word is composite */
 	int body_len;      /* composite word len */
+	cell literal;      /* number literal */
+	int is_literal;    /* is it literal? */
 } Word;
 
 typedef struct {
@@ -130,6 +132,10 @@ void run(Word *body, int len) {
 			push_frame(word->body, 0, word->body_len);
 			continue; /* Skip position checking for current frame */
 		}
+		/* Push literal on top of stack */
+		else if(word->is_literal) {
+			push(word->literal);
+		}
 
 		/* Pop frame */
 		if(frame->pos >= frame->len && rsp > 0 && --rsp) (void)0;
@@ -168,6 +174,12 @@ void repl(void) {
 					continue;
 				}
 
+				/* This is word */
+				if((ent = dict_find(token))) {
+					execute(&ent->word, ent->word.body_len);
+					continue;
+				}
+
 				/* This is number */
 				number = strtol(token, &endptr, 10);
 				if(token != endptr) {
@@ -176,12 +188,6 @@ void repl(void) {
 					else
 						printf("%s ? Unexpected %s in number token\n",
 							   token, endptr);
-					continue;
-				}
-
-				/* This is word */
-				if((ent = dict_find(token))) {
-					execute(&ent->word, ent->word.body_len);
 					continue;
 				}
 
@@ -206,7 +212,7 @@ void repl(void) {
 
 				/* This is word */
 				if((ent = dict_find(token))) {
-					if(new_word_ip > 128) {
+					if(new_word_ip >= 128) {
 						printf("%s ? Too long word definition (>%d words)\n",
 							   new_word_name, 128);
 						new_word_ip = 0;
@@ -218,10 +224,42 @@ void repl(void) {
 					continue;
 				}
 
+				/* This is number */
+				number = strtol(token, &endptr, 10);
+				if(token != endptr) {
+					if(*endptr == '\0') {
+						if(new_word_ip >= 128) {
+							printf("%s ? Too long word definition (>%d words)\n",
+								   new_word_name, 128);
+							new_word_ip = 0;
+							new_word_status = 0;
+							/* Ignore all next tokens */
+							break;
+						}
+
+						new_word_buf[new_word_ip].primitive  = NULL;
+						new_word_buf[new_word_ip].body       = NULL;
+						new_word_buf[new_word_ip].body_len   = -1;
+						new_word_buf[new_word_ip].literal    = number;
+						new_word_buf[new_word_ip].is_literal = 1;
+						new_word_ip++;
+					} else {
+						printf("%s ? Unexpected %s in number literal\n",
+							   token, endptr);
+						new_word_ip = 0;
+						new_word_status = 0;
+						/* Ignore all next tokens */
+						break;
+					}
+					continue;
+				}
+
+				/* End of word definition */
 				if(strcmp(";", token) == 0) {
 					if(new_word_ip == 0) {
 						printf("%s ? Empty word definition\n", new_word_name);
 						new_word_status = 0;
+						break;
 					}
 					/* Allocate memory for Word body and info */
 					new_word_size = sizeof(Word) * new_word_ip;
@@ -232,6 +270,8 @@ void repl(void) {
 					new_word->primitive = NULL;
 					new_word->body      = new_word + 1;
 					new_word->body_len  = new_word_ip;
+					new_word->literal   = 0;
+					new_word->is_literal= 0;
 					dict_push(new_word_name, new_word);
 
 					/* Clean status */
