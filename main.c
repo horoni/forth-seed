@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #define STACK_SIZE 256
+#define WORD_NAME_SIZE 32
 
 #define ASSERT(x)                                                              \
   do {                                                                         \
@@ -29,9 +30,9 @@ typedef struct {
 } Frame;
 
 typedef struct Entry { /* Dictionary of words */
-    char name[32];     /* name of word */
-    Word word;         /* word info */
-    struct Entry *prev; /* previous word */
+    char name[WORD_NAME_SIZE]; /* identifier of word */
+    Word word;                 /* word info */
+    struct Entry *prev;        /* previous word */
 } Entry;
 Entry *dict_head = NULL;
 
@@ -70,7 +71,7 @@ void dict_push(const char *name, Word *word) {
 	Entry *ent = malloc(sizeof(Entry));
 	memset(ent, 0, sizeof(Entry));
 
-	strncpy(ent->name, name, 32);
+	strncpy(ent->name, name, WORD_NAME_SIZE);
 	ent->word = *word;
 	if(dict_head)
 		ent->prev = dict_head;
@@ -105,14 +106,6 @@ Word wprim_mul  = {prim_mul,  NULL, -1};
 Word wprim_dot  = {prim_dot,  NULL, -1};
 Word wprim_cr   = {prim_cr,   NULL, -1};
 
-Word print_body[] =  {{prim_dot, NULL, -1},
-					  {prim_cr,  NULL, -1}};
-Word square_body[] = {{prim_dup, NULL, -1},
-					  {prim_mul, NULL, -1}};
-Word cube_body[] =   {{prim_dup, NULL,       -1},
-					  {NULL,     square_body, 2},
-					  {prim_mul, NULL,       -1}};
-
 
 void run(Word *body, int len) {
 	Frame *frame;
@@ -132,7 +125,7 @@ void run(Word *body, int len) {
 		if(word->primitive) {
 			word->primitive();
 		}
-		/* Push frame with user defined function */
+		/* Push frame with user defined word */
 		else if(word->body) {
 			push_frame(word->body, 0, word->body_len);
 			continue; /* Skip position checking for current frame */
@@ -143,7 +136,18 @@ void run(Word *body, int len) {
 	}
 }
 
+void execute(Word *body, int len) {
+	if(body->primitive)
+		run(body, 1);
+	else if(body->body)
+		run(body->body, len);
+}
+
 void repl(void) {
+	char new_word_name[WORD_NAME_SIZE];
+	Word new_word_buf[128], *new_word;
+	int new_word_status = 0, new_word_ip = 0, new_word_size = 0;
+
 	char *token, *tmp, *endptr;
 	char input[1024];
 	long number = 0;
@@ -157,27 +161,88 @@ void repl(void) {
 		}
 
 		while((token = next_token(&tmp)) != NULL) {
-			/* This is number */
-			number = strtol(token, &endptr, 10);
-			if(token != endptr) {
-				push(number);
-				continue;
-			}
+			if(new_word_status == 0) {
+				/* Switch to word define mode */
+				if(strcmp(":", token) == 0) {
+					new_word_status = 2;
+					continue;
+				}
 
-			/* This is word */
-			if((ent = dict_find(token))) {
-				run(&ent->word, 1);
-				continue;
-			}
+				/* This is number */
+				number = strtol(token, &endptr, 10);
+				if(token != endptr) {
+					if(*endptr == '\0')
+						push(number);
+					else
+						printf("%s ? Unexpected %s in number token\n",
+							   token, endptr);
+					continue;
+				}
 
-			/* Exit */
-			if(strcmp("BYE", token) == 0) {
-				running = 0;
-				break;
+				/* This is word */
+				if((ent = dict_find(token))) {
+					execute(&ent->word, ent->word.body_len);
+					continue;
+				}
+
+				/* Exit */
+				if(strcmp("BYE", token) == 0) {
+					running = 0;
+					break;
+				}
+			} else {
+				if(new_word_status == 2) {
+					if(strlen(token) >= WORD_NAME_SIZE) {
+						printf("%s ? Too long word identifier (>%d chars)\n",
+							   token, WORD_NAME_SIZE);
+						new_word_status = 0;
+						/* Ignore all next tokens */
+						break;
+					}
+					strncpy(new_word_name, token, WORD_NAME_SIZE);
+					new_word_status = 1;
+					continue;
+				}
+
+				/* This is word */
+				if((ent = dict_find(token))) {
+					if(new_word_ip > 128) {
+						printf("%s ? Too long word definition (>%d words)\n",
+							   new_word_name, 128);
+						new_word_ip = 0;
+						new_word_status = 0;
+						/* Ignore all next tokens */
+						break;
+					}
+					new_word_buf[new_word_ip++] = ent->word;
+					continue;
+				}
+
+				if(strcmp(";", token) == 0) {
+					if(new_word_ip == 0) {
+						printf("%s ? Empty word definition\n", new_word_name);
+						new_word_status = 0;
+					}
+					/* Allocate memory for Word body and info */
+					new_word_size = sizeof(Word) * new_word_ip;
+					new_word = malloc(new_word_size + sizeof(Word));
+
+					/* Push new word */
+					memcpy(new_word + 1, new_word_buf, new_word_size);
+					new_word->primitive = NULL;
+					new_word->body      = new_word + 1;
+					new_word->body_len  = new_word_ip;
+					dict_push(new_word_name, new_word);
+
+					/* Clean status */
+					new_word_ip = 0;
+					new_word_status = 0;
+					continue;
+				}
 			}
 
 			/* Error */
-			puts("? Unrecognized word");
+			printf("%s ? Unrecognized word\n", token);
 		}
 	}
 }
@@ -190,14 +255,6 @@ int main(void) {
 	dict_push("CR",  &wprim_cr);
 
 	repl();
-
-	push(5);
-	run(square_body, 2);
-	run(print_body, 2);
-
-	push(5);
-	run(cube_body, 2);
-	run(print_body, 2);
 
 	return 0;
 }
