@@ -123,8 +123,11 @@ void prim_lt(void)   { cell b = pop(), a = pop(); push(a <  b ? FORTH_TRUE : FOR
 void prim_le(void)   { cell b = pop(), a = pop(); push(a <= b ? FORTH_TRUE : FORTH_FALSE); }
 void prim_gt(void)   { cell b = pop(), a = pop(); push(a >  b ? FORTH_TRUE : FORTH_FALSE); }
 void prim_ge(void)   { cell b = pop(), a = pop(); push(a >= b ? FORTH_TRUE : FORTH_FALSE); }
-void prim_plus(void) { cell b = pop(), a = pop(); push(a + b); }
+void prim_add(void)  { cell b = pop(), a = pop(); push(a + b); }
+void prim_sub(void)  { cell b = pop(), a = pop(); push(a - b); }
 void prim_mul(void)  { cell b = pop(), a = pop(); push(a * b); }
+void prim_div(void)  { cell b = pop(), a = pop(); push(a / b); }
+void prim_mod(void)  { cell b = pop(), a = pop(); push(a % b); }
 void prim_dot(void)  { printf("%ld ", (long)pop()); }
 void prim_cr(void)   { printf("\n"); }
 
@@ -139,8 +142,11 @@ Word wprim_lt   = {WORD_PRIMITIVE, {prim_lt  }, -1};
 Word wprim_le   = {WORD_PRIMITIVE, {prim_le  }, -1};
 Word wprim_gt   = {WORD_PRIMITIVE, {prim_gt  }, -1};
 Word wprim_ge   = {WORD_PRIMITIVE, {prim_ge  }, -1};
-Word wprim_plus = {WORD_PRIMITIVE, {prim_plus}, -1};
+Word wprim_add  = {WORD_PRIMITIVE, {prim_add }, -1};
+Word wprim_sub  = {WORD_PRIMITIVE, {prim_sub }, -1};
 Word wprim_mul  = {WORD_PRIMITIVE, {prim_mul }, -1};
+Word wprim_div  = {WORD_PRIMITIVE, {prim_div }, -1};
+Word wprim_mod  = {WORD_PRIMITIVE, {prim_mod }, -1};
 Word wprim_dot  = {WORD_PRIMITIVE, {prim_dot }, -1};
 Word wprim_cr   = {WORD_PRIMITIVE, {prim_cr  }, -1};
 
@@ -156,8 +162,11 @@ void prim__register(void) {
 	dict_push("<=",   &wprim_le);
 	dict_push(">",    &wprim_gt);
 	dict_push(">=",   &wprim_ge);
-	dict_push("+",    &wprim_plus);
+	dict_push("+",    &wprim_add);
+	dict_push("-",    &wprim_sub);
 	dict_push("*",    &wprim_mul);
+	dict_push("/",    &wprim_div);
+	dict_push("MOD",  &wprim_mod);
 	dict_push(".",    &wprim_dot);
 	dict_push("CR",   &wprim_cr);
 }
