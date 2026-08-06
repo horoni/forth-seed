@@ -229,9 +229,11 @@ void repl(void) {
 	char new_word_name[WORD_NAME_SIZE];
 	Word new_word_buf[128], *new_word;
 	int new_word_status = 0, new_word_ip = 0, new_word_size = 0;
+	int ctrl_stack[16]; /* control flow stack */
+	int ctrl_sp = 0, ctrl_tmp = 0;
 
 	char *token, *tmp, *endptr;
-	char input[1024];
+	char input[1024], err_buf[512];
 	long number = 0;
 	int running = 1;
 	Entry *ent;
@@ -275,64 +277,26 @@ void repl(void) {
 			} else {
 				if(new_word_status == 2) {
 					if(strlen(token) >= WORD_NAME_SIZE) {
-						printf("%s ? Too long word identifier (>%d chars)\n",
+						sprintf(err_buf, "%s ? Too long word identifier (>%d chars)\n",
 							   token, WORD_NAME_SIZE);
-						new_word_status = 0;
-						/* Ignore all next tokens */
-						break;
+						goto def_fail;
 					}
 					strncpy(new_word_name, token, WORD_NAME_SIZE);
 					new_word_status = 1;
 					continue;
 				}
 
-				/* This is word */
-				if((ent = dict_find(token))) {
-					if(new_word_ip >= 128) {
-						printf("%s ? Too long word definition (>%d words)\n",
-							   new_word_name, 128);
-						new_word_ip = 0;
-						new_word_status = 0;
-						/* Ignore all next tokens */
-						break;
-					}
-					new_word_buf[new_word_ip++] = ent->word;
-					continue;
-				}
-
-				/* This is number */
-				number = strtol(token, &endptr, 10);
-				if(token != endptr) {
-					if(*endptr == '\0') {
-						if(new_word_ip >= 128) {
-							printf("%s ? Too long word definition (>%d words)\n",
-								   new_word_name, 128);
-							new_word_ip = 0;
-							new_word_status = 0;
-							/* Ignore all next tokens */
-							break;
-						}
-
-						new_word_buf[new_word_ip].type      = WORD_LITERAL;
-						new_word_buf[new_word_ip].v.literal = number;
-						new_word_ip++;
-					} else {
-						printf("%s ? Unexpected %s in number literal\n",
-							   token, endptr);
-						new_word_ip = 0;
-						new_word_status = 0;
-						/* Ignore all next tokens */
-						break;
-					}
-					continue;
-				}
-
 				/* End of word definition */
 				if(strcmp(";", token) == 0) {
 					if(new_word_ip == 0) {
-						printf("%s ? Empty word definition\n", new_word_name);
-						new_word_status = 0;
-						break;
+						sprintf(err_buf, "%s ? Empty word definition\n",
+								new_word_name);
+						goto def_fail;
+					}
+					if(ctrl_sp > 0) {
+						sprintf(err_buf, "%s ? Not closed control flow\n",
+								new_word_name);
+						goto def_fail;
 					}
 					/* Allocate memory for Word body and info */
 					new_word_size = sizeof(Word) * new_word_ip;
@@ -350,6 +314,105 @@ void repl(void) {
 					new_word_status = 0;
 					continue;
 				}
+
+				if(new_word_ip >= 128) {
+					sprintf(err_buf, "%s ? Too long word definition (>%d words)\n",
+							new_word_name, 128);
+					goto def_fail;
+				}
+
+				/* Control flow block: START */
+				if(strcmp("IF", token) == 0) {
+					if(ctrl_sp >= 16) {
+						sprintf(err_buf, "%s ? %s too many control flow words",
+								new_word_name, token);
+						goto def_fail;
+					}
+					new_word_buf[new_word_ip].type = WORD_BRANCH0;
+					ctrl_stack[ctrl_sp++] = new_word_ip;
+					new_word_ip++;
+					continue;
+				}
+				else if(strcmp("ELSE", token) == 0) {
+					if(ctrl_sp < 1) {
+						sprintf(err_buf, "%s ? %s unmatched",
+								new_word_name, token);
+						goto def_fail;
+					}
+					/* IF position */
+					ctrl_tmp = ctrl_stack[--ctrl_sp];
+
+					new_word_buf[new_word_ip].type = WORD_BRANCH;
+					ctrl_stack[ctrl_sp++] = new_word_ip;
+					new_word_ip++;
+
+					new_word_buf[ctrl_tmp].br_off = new_word_ip - ctrl_tmp;
+					continue;
+				}
+				else if(strcmp("THEN", token) == 0) {
+					if(ctrl_sp < 1) {
+						sprintf(err_buf, "%s ? %s unmatched",
+								new_word_name, token);
+						goto def_fail;
+					}
+					/* ELSE / IF position */
+					ctrl_tmp = ctrl_stack[--ctrl_sp];
+					new_word_buf[ctrl_tmp].br_off = new_word_ip - ctrl_tmp;
+					continue;
+				}
+				else if(strcmp("BEGIN", token) == 0) {
+					if(ctrl_sp >= 16) {
+						sprintf(err_buf, "%s ? %s too many control flow words",
+								new_word_name, token);
+						goto def_fail;
+					}
+					ctrl_stack[ctrl_sp++] = new_word_ip;
+					continue;
+				}
+				else if(strcmp("UNTIL", token) == 0) {
+					if(ctrl_sp < 1) {
+						sprintf(err_buf, "%s ? %s unmatched",
+								new_word_name, token);
+						goto def_fail;
+					}
+					/* BEGIN position */
+					ctrl_tmp = ctrl_stack[--ctrl_sp];
+
+					new_word_buf[new_word_ip].type = WORD_BRANCH0;
+					new_word_buf[new_word_ip].br_off = ctrl_tmp - new_word_ip;
+					new_word_ip++;
+					continue;
+				}
+				/* Control flow block: END */
+
+				/* This is word */
+				if((ent = dict_find(token))) {
+					new_word_buf[new_word_ip++] = ent->word;
+					continue;
+				}
+
+				/* This is number */
+				number = strtol(token, &endptr, 10);
+				if(token != endptr) {
+					if(*endptr == '\0') {
+						new_word_buf[new_word_ip].type      = WORD_LITERAL;
+						new_word_buf[new_word_ip].v.literal = number;
+						new_word_ip++;
+					} else {
+						sprintf(err_buf, "%s ? Unexpected %s in number literal\n",
+							   token, endptr);
+						goto def_fail;
+					}
+					continue;
+				}
+				continue;
+			def_fail:
+				puts(err_buf);
+				new_word_status = 0;
+				new_word_ip = 0;
+				ctrl_sp = 0;
+				/* Ignore all next tokens */
+				break;
 			}
 
 			/* Error */
