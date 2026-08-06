@@ -315,7 +315,6 @@ void repl(void) {
 
 						new_word_buf[new_word_ip].type      = WORD_LITERAL;
 						new_word_buf[new_word_ip].v.literal = number;
-						new_word_buf[new_word_ip].body_len  = -1;
 						new_word_ip++;
 					} else {
 						printf("%s ? Unexpected %s in number literal\n",
