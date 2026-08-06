@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2026 horoni (https://github.com/horoni)
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
