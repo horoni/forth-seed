@@ -104,17 +104,25 @@ char *next_token(char **input) {
 }
 
 /* Primitives */
+void prim_swap(void) { cell a = pop(), b = pop(); push(a); push(b); }
 void prim_dup(void)  { cell a = pop(); push(a); push(a); }
+void prim_over(void) { cell a = pop(), b = pop(); push(b); push(a); push(b); }
+void prim_rot(void)  { cell a = pop(), b = pop(), c = pop(); push(b); push(a); push(c); }
+void prim_drop(void) { pop(); }
 void prim_plus(void) { cell b = pop(), a = pop(); push(a + b); }
 void prim_mul(void)  { cell b = pop(), a = pop(); push(a * b); }
 void prim_dot(void)  { printf("%ld ", (long)pop()); }
 void prim_cr(void)   { printf("\n"); }
 
-Word wprim_dup  = {WORD_PRIMITIVE, prim_dup,  -1};
-Word wprim_plus = {WORD_PRIMITIVE, prim_plus, -1};
-Word wprim_mul  = {WORD_PRIMITIVE, prim_mul,  -1};
-Word wprim_dot  = {WORD_PRIMITIVE, prim_dot,  -1};
-Word wprim_cr   = {WORD_PRIMITIVE, prim_cr,   -1};
+Word wprim_swap = {WORD_PRIMITIVE, {prim_swap}, -1};
+Word wprim_dup  = {WORD_PRIMITIVE, {prim_dup }, -1};
+Word wprim_over = {WORD_PRIMITIVE, {prim_over}, -1};
+Word wprim_rot  = {WORD_PRIMITIVE, {prim_rot }, -1};
+Word wprim_drop = {WORD_PRIMITIVE, {prim_drop}, -1};
+Word wprim_plus = {WORD_PRIMITIVE, {prim_plus}, -1};
+Word wprim_mul  = {WORD_PRIMITIVE, {prim_mul }, -1};
+Word wprim_dot  = {WORD_PRIMITIVE, {prim_dot }, -1};
+Word wprim_cr   = {WORD_PRIMITIVE, {prim_cr  }, -1};
 
 
 void run(Word *body, int len) {
@@ -292,11 +300,15 @@ void repl(void) {
 }
 
 int main(void) {
-	dict_push("DUP", &wprim_dup);
-	dict_push("+",   &wprim_plus);
-	dict_push("*",   &wprim_mul);
-	dict_push(".",   &wprim_dot);
-	dict_push("CR",  &wprim_cr);
+	dict_push("SWAP", &wprim_swap);
+	dict_push("DUP",  &wprim_dup);
+	dict_push("OVER", &wprim_over);
+	dict_push("ROT",  &wprim_rot);
+	dict_push("DROP", &wprim_drop);
+	dict_push("+",    &wprim_plus);
+	dict_push("*",    &wprim_mul);
+	dict_push(".",    &wprim_dot);
+	dict_push("CR",   &wprim_cr);
 
 	repl();
 
