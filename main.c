@@ -47,16 +47,16 @@ typedef struct Entry { /* Dictionary of words */
 Entry *dict_head = NULL;
 
 /* Stack */
-cell dstack[STACK_SIZE], *dsp = dstack + STACK_SIZE;
+cell dstack[STACK_SIZE], *dsp = dstack;
 Frame rstack[STACK_SIZE]; int rsp = 0;
 
 void push(cell v) {
-	ASSERT(dsp > dstack); /* Overflow */
-	*--dsp = v;
+	ASSERT(dsp < dstack + STACK_SIZE); /* Overflow */
+	*dsp++ = v;
 }
 cell pop(void) {
-	ASSERT(dsp < dstack + STACK_SIZE); /* Underflow */
-	return *dsp++;
+	ASSERT(dsp > dstack); /* Underflow */
+	return *--dsp;
 }
 
 static void push_frame(Word *body, int pos, int len) {
