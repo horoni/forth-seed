@@ -24,6 +24,8 @@ typedef void (*word_fn)(void);
 
 enum WORD_TYPE {
 	WORD_PRIMITIVE,
+	WORD_BRANCH0,
+	WORD_BRANCH,
 	WORD_COMPOSITE,
 	WORD_LITERAL
 };
@@ -36,6 +38,7 @@ typedef struct Word {
 		cell literal;      /* number literal */
 	} v;
 	int body_len;          /* composite word len */
+	int br_off;            /* branch offset */
 } Word;
 
 typedef struct {
@@ -198,6 +201,16 @@ void run(Word *body, int len) {
 		/* Push literal on top of stack */
 		else if(word->type == WORD_LITERAL) {
 			push(word->v.literal);
+		}
+		/* Add branch offset to IP if top of stack is FALSE */
+		else if(word->type == WORD_BRANCH0) {
+			if(pop() == FORTH_FALSE) {
+				frame->pos += word->br_off - 1;
+			}
+		}
+		/* Add branch offset to IP unconditionally */
+		else if(word->type == WORD_BRANCH) {
+			frame->pos += word->br_off - 1;
 		}
 
 		/* Pop frame */
