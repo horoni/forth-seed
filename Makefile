@@ -1,6 +1,6 @@
 .PHONY = all
 
-CFLAGS := -O0 -g
+CFLAGS := -Wall -pedantic -std=c89 -O0 -g
 
 all: main
 
