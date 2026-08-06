@@ -17,12 +17,20 @@
 typedef long cell;
 typedef void (*word_fn)(void);
 
+enum WORD_TYPE {
+	WORD_PRIMITIVE,
+	WORD_COMPOSITE,
+	WORD_LITERAL
+};
+
 typedef struct Word {
-	word_fn primitive; /* non-null if word is primitive */
-	struct Word *body; /* non-null if word is composite */
-	int body_len;      /* composite word len */
-	cell literal;      /* number literal */
-	int is_literal;    /* is it literal? */
+	enum WORD_TYPE type;   /* type of word */
+	union {
+		word_fn primitive; /* non-null if word is primitive */
+		struct Word *body; /* non-null if word is composite */
+		cell literal;      /* number literal */
+	} v;
+	int body_len;          /* composite word len */
 } Word;
 
 typedef struct {
@@ -102,11 +110,11 @@ void prim_mul(void)  { cell b = pop(), a = pop(); push(a * b); }
 void prim_dot(void)  { printf("%ld ", (long)pop()); }
 void prim_cr(void)   { printf("\n"); }
 
-Word wprim_dup  = {prim_dup,  NULL, -1};
-Word wprim_plus = {prim_plus, NULL, -1};
-Word wprim_mul  = {prim_mul,  NULL, -1};
-Word wprim_dot  = {prim_dot,  NULL, -1};
-Word wprim_cr   = {prim_cr,   NULL, -1};
+Word wprim_dup  = {WORD_PRIMITIVE, prim_dup,  -1};
+Word wprim_plus = {WORD_PRIMITIVE, prim_plus, -1};
+Word wprim_mul  = {WORD_PRIMITIVE, prim_mul,  -1};
+Word wprim_dot  = {WORD_PRIMITIVE, prim_dot,  -1};
+Word wprim_cr   = {WORD_PRIMITIVE, prim_cr,   -1};
 
 
 void run(Word *body, int len) {
@@ -124,17 +132,17 @@ void run(Word *body, int len) {
 		word = &frame->body[frame->pos++];
 
 		/* Execute current word if primitive */
-		if(word->primitive) {
-			word->primitive();
+		if(word->type == WORD_PRIMITIVE) {
+			word->v.primitive();
 		}
 		/* Push frame with user defined word */
-		else if(word->body) {
-			push_frame(word->body, 0, word->body_len);
+		else if(word->type == WORD_COMPOSITE) {
+			push_frame(word->v.body, 0, word->body_len);
 			continue; /* Skip position checking for current frame */
 		}
 		/* Push literal on top of stack */
-		else if(word->is_literal) {
-			push(word->literal);
+		else if(word->type == WORD_LITERAL) {
+			push(word->v.literal);
 		}
 
 		/* Pop frame */
@@ -143,10 +151,10 @@ void run(Word *body, int len) {
 }
 
 void execute(Word *body, int len) {
-	if(body->primitive)
+	if(body->type == WORD_PRIMITIVE)
 		run(body, 1);
-	else if(body->body)
-		run(body->body, len);
+	else if(body->type == WORD_COMPOSITE)
+		run(body->v.body, len);
 }
 
 void repl(void) {
@@ -237,11 +245,9 @@ void repl(void) {
 							break;
 						}
 
-						new_word_buf[new_word_ip].primitive  = NULL;
-						new_word_buf[new_word_ip].body       = NULL;
-						new_word_buf[new_word_ip].body_len   = -1;
-						new_word_buf[new_word_ip].literal    = number;
-						new_word_buf[new_word_ip].is_literal = 1;
+						new_word_buf[new_word_ip].type      = WORD_LITERAL;
+						new_word_buf[new_word_ip].v.literal = number;
+						new_word_buf[new_word_ip].body_len  = -1;
 						new_word_ip++;
 					} else {
 						printf("%s ? Unexpected %s in number literal\n",
@@ -267,11 +273,9 @@ void repl(void) {
 
 					/* Push new word */
 					memcpy(new_word + 1, new_word_buf, new_word_size);
-					new_word->primitive = NULL;
-					new_word->body      = new_word + 1;
-					new_word->body_len  = new_word_ip;
-					new_word->literal   = 0;
-					new_word->is_literal= 0;
+					new_word->type     = WORD_COMPOSITE;
+					new_word->v.body   = new_word + 1;
+					new_word->body_len = new_word_ip;
 					dict_push(new_word_name, new_word);
 
 					/* Clean status */
