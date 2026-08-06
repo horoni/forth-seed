@@ -104,11 +104,20 @@ char *next_token(char **input) {
 }
 
 /* Primitives */
+#define FORTH_TRUE  (~((cell)0))
+#define FORTH_FALSE   ((cell)0)
+
 void prim_swap(void) { cell a = pop(), b = pop(); push(a); push(b); }
 void prim_dup(void)  { cell a = pop(); push(a); push(a); }
 void prim_over(void) { cell a = pop(), b = pop(); push(b); push(a); push(b); }
 void prim_rot(void)  { cell a = pop(), b = pop(), c = pop(); push(b); push(a); push(c); }
 void prim_drop(void) { pop(); }
+void prim_eq(void)   { cell b = pop(), a = pop(); push(a == b ? FORTH_TRUE : FORTH_FALSE); }
+void prim_ne(void)   { cell b = pop(), a = pop(); push(a != b ? FORTH_TRUE : FORTH_FALSE); }
+void prim_lt(void)   { cell b = pop(), a = pop(); push(a <  b ? FORTH_TRUE : FORTH_FALSE); }
+void prim_le(void)   { cell b = pop(), a = pop(); push(a <= b ? FORTH_TRUE : FORTH_FALSE); }
+void prim_gt(void)   { cell b = pop(), a = pop(); push(a >  b ? FORTH_TRUE : FORTH_FALSE); }
+void prim_ge(void)   { cell b = pop(), a = pop(); push(a >= b ? FORTH_TRUE : FORTH_FALSE); }
 void prim_plus(void) { cell b = pop(), a = pop(); push(a + b); }
 void prim_mul(void)  { cell b = pop(), a = pop(); push(a * b); }
 void prim_dot(void)  { printf("%ld ", (long)pop()); }
@@ -119,6 +128,12 @@ Word wprim_dup  = {WORD_PRIMITIVE, {prim_dup }, -1};
 Word wprim_over = {WORD_PRIMITIVE, {prim_over}, -1};
 Word wprim_rot  = {WORD_PRIMITIVE, {prim_rot }, -1};
 Word wprim_drop = {WORD_PRIMITIVE, {prim_drop}, -1};
+Word wprim_eq   = {WORD_PRIMITIVE, {prim_eq  }, -1};
+Word wprim_ne   = {WORD_PRIMITIVE, {prim_ne  }, -1};
+Word wprim_lt   = {WORD_PRIMITIVE, {prim_lt  }, -1};
+Word wprim_le   = {WORD_PRIMITIVE, {prim_le  }, -1};
+Word wprim_gt   = {WORD_PRIMITIVE, {prim_gt  }, -1};
+Word wprim_ge   = {WORD_PRIMITIVE, {prim_ge  }, -1};
 Word wprim_plus = {WORD_PRIMITIVE, {prim_plus}, -1};
 Word wprim_mul  = {WORD_PRIMITIVE, {prim_mul }, -1};
 Word wprim_dot  = {WORD_PRIMITIVE, {prim_dot }, -1};
@@ -305,6 +320,12 @@ int main(void) {
 	dict_push("OVER", &wprim_over);
 	dict_push("ROT",  &wprim_rot);
 	dict_push("DROP", &wprim_drop);
+	dict_push("=",    &wprim_eq);
+	dict_push("<>",   &wprim_ne);
+	dict_push("<",    &wprim_lt);
+	dict_push("<=",   &wprim_le);
+	dict_push(">",    &wprim_gt);
+	dict_push(">=",   &wprim_ge);
 	dict_push("+",    &wprim_plus);
 	dict_push("*",    &wprim_mul);
 	dict_push(".",    &wprim_dot);
