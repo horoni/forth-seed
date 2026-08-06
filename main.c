@@ -144,6 +144,24 @@ Word wprim_mul  = {WORD_PRIMITIVE, {prim_mul }, -1};
 Word wprim_dot  = {WORD_PRIMITIVE, {prim_dot }, -1};
 Word wprim_cr   = {WORD_PRIMITIVE, {prim_cr  }, -1};
 
+void prim__register(void) {
+	dict_push("SWAP", &wprim_swap);
+	dict_push("DUP",  &wprim_dup);
+	dict_push("OVER", &wprim_over);
+	dict_push("ROT",  &wprim_rot);
+	dict_push("DROP", &wprim_drop);
+	dict_push("=",    &wprim_eq);
+	dict_push("<>",   &wprim_ne);
+	dict_push("<",    &wprim_lt);
+	dict_push("<=",   &wprim_le);
+	dict_push(">",    &wprim_gt);
+	dict_push(">=",   &wprim_ge);
+	dict_push("+",    &wprim_plus);
+	dict_push("*",    &wprim_mul);
+	dict_push(".",    &wprim_dot);
+	dict_push("CR",   &wprim_cr);
+}
+
 
 void run(Word *body, int len) {
 	Frame *frame;
@@ -320,21 +338,7 @@ void repl(void) {
 }
 
 int main(void) {
-	dict_push("SWAP", &wprim_swap);
-	dict_push("DUP",  &wprim_dup);
-	dict_push("OVER", &wprim_over);
-	dict_push("ROT",  &wprim_rot);
-	dict_push("DROP", &wprim_drop);
-	dict_push("=",    &wprim_eq);
-	dict_push("<>",   &wprim_ne);
-	dict_push("<",    &wprim_lt);
-	dict_push("<=",   &wprim_le);
-	dict_push(">",    &wprim_gt);
-	dict_push(">=",   &wprim_ge);
-	dict_push("+",    &wprim_plus);
-	dict_push("*",    &wprim_mul);
-	dict_push(".",    &wprim_dot);
-	dict_push("CR",   &wprim_cr);
+	prim__register();
 
 	repl();
 
