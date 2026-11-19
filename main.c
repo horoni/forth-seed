@@ -4,11 +4,13 @@
  */
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
 
 #define STACK_SIZE 256
 #define WORD_NAME_SIZE 32
+#define INPUT_SIZE 1024
 
 #define ASSERT(x)                                                              \
   do{                                                                          \
@@ -109,6 +111,26 @@ char *next_token(char **input) {
 
 	*input = tmp;
 	return tok;
+}
+
+/* snprintf is not available in C89; format into a scratch buffer large
+ * enough for the longest message (two input-sized tokens plus text) */
+static int snprintf(char *buf, size_t size, const char *fmt, ...) {
+	char tmp[2 * INPUT_SIZE + 64];
+	va_list ap;
+	int len;
+	size_t n;
+
+	va_start(ap, fmt);
+	len = vsprintf(tmp, fmt, ap);
+	va_end(ap);
+
+	if(size > 0) {
+		n = (size_t)len < size ? (size_t)len : size - 1;
+		memcpy(buf, tmp, n);
+		buf[n] = '\0';
+	}
+	return len;
 }
 
 /* Primitives */
@@ -238,7 +260,7 @@ void repl(void) {
 	int ctrl_sp = 0, ctrl_tmp = 0;
 
 	char *token, *tmp, *endptr;
-	char input[1024], err_buf[512];
+	char input[INPUT_SIZE], err_buf[512];
 	long number = 0;
 	int running = 1;
 	Entry *ent;
@@ -282,7 +304,7 @@ void repl(void) {
 			} else {
 				if(new_word_status == 2) {
 					if(strlen(token) >= WORD_NAME_SIZE) {
-						sprintf(err_buf, "%s ? Too long word identifier (>%d chars)\n",
+						snprintf(err_buf, sizeof(err_buf), "%s ? Too long word identifier (>%d chars)\n",
 							   token, WORD_NAME_SIZE);
 						goto def_fail;
 					}
@@ -294,12 +316,12 @@ void repl(void) {
 				/* End of word definition */
 				if(strcmp(";", token) == 0) {
 					if(new_word_ip == 0) {
-						sprintf(err_buf, "%s ? Empty word definition\n",
+						snprintf(err_buf, sizeof(err_buf), "%s ? Empty word definition\n",
 								new_word_name);
 						goto def_fail;
 					}
 					if(ctrl_sp > 0) {
-						sprintf(err_buf, "%s ? Not closed control flow\n",
+						snprintf(err_buf, sizeof(err_buf), "%s ? Not closed control flow\n",
 								new_word_name);
 						goto def_fail;
 					}
@@ -321,7 +343,7 @@ void repl(void) {
 				}
 
 				if(new_word_ip >= 128) {
-					sprintf(err_buf, "%s ? Too long word definition (>%d words)\n",
+					snprintf(err_buf, sizeof(err_buf), "%s ? Too long word definition (>%d words)\n",
 							new_word_name, 128);
 					goto def_fail;
 				}
@@ -329,7 +351,7 @@ void repl(void) {
 				/* Control flow block: START */
 				if(strcmp("IF", token) == 0) {
 					if(ctrl_sp >= 16) {
-						sprintf(err_buf, "%s ? %s too many control flow words",
+						snprintf(err_buf, sizeof(err_buf), "%s ? %s too many control flow words",
 								new_word_name, token);
 						goto def_fail;
 					}
@@ -340,7 +362,7 @@ void repl(void) {
 				}
 				else if(strcmp("ELSE", token) == 0) {
 					if(ctrl_sp < 1) {
-						sprintf(err_buf, "%s ? %s unmatched",
+						snprintf(err_buf, sizeof(err_buf), "%s ? %s unmatched",
 								new_word_name, token);
 						goto def_fail;
 					}
@@ -356,7 +378,7 @@ void repl(void) {
 				}
 				else if(strcmp("THEN", token) == 0) {
 					if(ctrl_sp < 1) {
-						sprintf(err_buf, "%s ? %s unmatched",
+						snprintf(err_buf, sizeof(err_buf), "%s ? %s unmatched",
 								new_word_name, token);
 						goto def_fail;
 					}
@@ -367,7 +389,7 @@ void repl(void) {
 				}
 				else if(strcmp("BEGIN", token) == 0) {
 					if(ctrl_sp >= 16) {
-						sprintf(err_buf, "%s ? %s too many control flow words",
+						snprintf(err_buf, sizeof(err_buf), "%s ? %s too many control flow words",
 								new_word_name, token);
 						goto def_fail;
 					}
@@ -376,7 +398,7 @@ void repl(void) {
 				}
 				else if(strcmp("UNTIL", token) == 0) {
 					if(ctrl_sp < 1) {
-						sprintf(err_buf, "%s ? %s unmatched",
+						snprintf(err_buf, sizeof(err_buf), "%s ? %s unmatched",
 								new_word_name, token);
 						goto def_fail;
 					}
@@ -404,7 +426,7 @@ void repl(void) {
 						new_word_buf[new_word_ip].v.literal = number;
 						new_word_ip++;
 					} else {
-						sprintf(err_buf, "%s ? Unexpected %s in number literal\n",
+						snprintf(err_buf, sizeof(err_buf), "%s ? Unexpected %s in number literal\n",
 							   token, endptr);
 						goto def_fail;
 					}
