@@ -185,8 +185,16 @@ void run(Word *body, int len) {
 	push_frame(body, 0, len);
 
 	while(rsp > 0) {
-		/* Set current frame and word pointer */
+		/* Set current frame */
 		frame = &rstack[rsp - 1];
+
+		/* Pop frame if there are no more words to execute */
+		if(frame->pos >= frame->len) {
+			rsp--;
+			continue;
+		}
+
+		/* Set word pointer */
 		word = &frame->body[frame->pos++];
 
 		/* Execute current word if primitive */
@@ -212,9 +220,6 @@ void run(Word *body, int len) {
 		else if(word->type == WORD_BRANCH) {
 			frame->pos += word->br_off - 1;
 		}
-
-		/* Pop frame */
-		if(frame->pos >= frame->len && rsp > 0 && --rsp) (void)0;
 	}
 }
 
