@@ -69,13 +69,17 @@ cell pop(void) {
 	return *--dsp;
 }
 
-static void push_frame(Word *body, int pos, int len) {
+static int push_frame(Word *body, int pos, int len) {
 	Frame tmp;
+
+	if(rsp >= STACK_SIZE)
+		return -1;
 
 	tmp.body = body;
 	tmp.pos  = pos;
 	tmp.len  = len;
 	rstack[rsp++] = tmp;
+	return 0;
 }
 
 /* Dictionary utils */
@@ -197,14 +201,17 @@ void prim__register(void) {
 }
 
 
-void run(Word *body, int len) {
+int run(Word *body, int len) {
 	Frame *frame;
 	Word *word;
 
 	ASSERT(rsp == 0);
 
 	/* Push first frame */
-	push_frame(body, 0, len);
+	if(push_frame(body, 0, len) < 0) {
+		rsp = 0;
+		return -1;
+	}
 
 	while(rsp > 0) {
 		/* Set current frame */
@@ -225,7 +232,10 @@ void run(Word *body, int len) {
 		}
 		/* Push frame with user defined word */
 		else if(word->type == WORD_COMPOSITE) {
-			push_frame(word->v.body, 0, word->body_len);
+			if(push_frame(word->v.body, 0, word->body_len) < 0) {
+				rsp = 0;
+				return -1;
+			}
 			continue; /* Skip position checking for current frame */
 		}
 		/* Push literal on top of stack */
@@ -243,13 +253,15 @@ void run(Word *body, int len) {
 			frame->pos += word->br_off - 1;
 		}
 	}
+	return 0;
 }
 
-void execute(Word *body, int len) {
+int execute(Word *body, int len) {
 	if(body->type == WORD_PRIMITIVE)
-		run(body, 1);
+		return run(body, 1);
 	else if(body->type == WORD_COMPOSITE)
-		run(body->v.body, len);
+		return run(body->v.body, len);
+	return 0;
 }
 
 void repl(void) {
@@ -281,7 +293,8 @@ void repl(void) {
 
 				/* This is word */
 				if((ent = dict_find(token))) {
-					execute(&ent->word, ent->word.body_len);
+					if(execute(&ent->word, ent->word.body_len) < 0)
+						printf("%s ? Return stack overflow\n", token);
 					continue;
 				}
 
